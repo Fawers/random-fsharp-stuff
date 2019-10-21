@@ -1,3 +1,4 @@
 # Welcome!
 
-Check the branches present in this repository!
+Feel free to check the code in [code.fsx](./code.fsx).
+Proceed to the next step when done.
