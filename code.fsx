@@ -1,63 +1,65 @@
-(*
-Alright, so the idea is to build some simple stuff to make sure I understand
-the concept of binding, two-way-railtrack, function composition, and some
-other stuff. Yes, I did have this idea while washing dishes.
-*)
+// Great! But there's one thing that's been bugging me.
+// Did you notice we're washing and cleaning dishes that
+// may already be washed or cleaned?
+// Doesn't feel right, eh? Why would we waste water and
+// dish soap to wash and clean everything again?
+// That's why we will ~choose~ which dishes we should wash,
+// and which dishes we should clean.
 
-// So, the idea is to represent some real-life scenarios to try and explain
-// (primarily to myself, but also to whomever may be interested) the concepts
-// of map, bind, et cetera with dish washing.
-// Disclaimer: this is not the best way to do things in real life IMO. What
-// I'm writing here is for educational purposes only.
-
-// Say we have a Dish type,
 type Dish =
-  // which can be represented by a clean, dry dish,
   | CleanDish
-  // a washed, but still wet dish,
   | WashedDish
-  // and a dirty dish.
   | DirtyDish
 
-// And we have some handy functions to deal with them, say,
-let washDish (_: Dish): Dish =
-  WashedDish
 
-let cleanDish (_: Dish): Dish =
-  CleanDish
+// Also, we have to make sure our functions understand that
+// we're not supposed to wash washed dishes, or clean cleaned
+// dishes. Let's create an exception type and raise it!
+exception DishException of string
 
-// Nice, now we can have some shiny dishes.
 
-// With these, we can wash and clean one dish, or use map to wash and clean
-// several dishes at once.
+let washDish (dish: Dish): Dish =
+  match dish with
+  | DirtyDish -> WashedDish
+  | _         -> raise <| DishException "no need to wash"
+
+let cleanDish (dish: Dish): Dish =
+  match dish with
+  | WashedDish  -> CleanDish
+  | DirtyDish   -> raise <| DishException "must wash first"
+  | CleanDish   -> raise <| DishException "no need to clean"
+
 
 let dishes = [DirtyDish; DirtyDish; WashedDish; DirtyDish; CleanDish]
-
-// We wash them all
-dishes |> List.map washDish
-  // and clean them
-  |> List.map cleanDish
-  // and finally, check the results
-  |> printfn "map washDish -> map cleanDish:\t%A"
-
-// Mmm... But that doesn't really feel right... I mean, we're iterating the list
-// twice. Maybe we don't _need_ to do that. What if, for every dish, we washed
-// AND cleaned it right afterwards? We can do that with composition.
-
 let washAndCleanDish = washDish >> cleanDish
-// ↑ this means, the output of `washDish` will be the input of `cleanDish`.
-// Pretty much the same as the pipe (|>) operator, but without the arguments.
-// The same could be written with the pipe operator as follows:
-let washAndCleanDish2 dish = washDish dish |> cleanDish
-// or
-let washAndCleanDish3 = cleanDish << washDish
-// or
-let washAndCleanDish4 dish = cleanDish <| washDish dish
-// Remember: the direction of the arrow tells the way; in all of these,
-// `washDish` will run first.
 
-// Now we can use one, and only one call to map to wash and clean dishes:
-dishes
-  |> List.map washAndCleanDish
-  // And display the results:
-  |> printfn "map washAndClean:\t\t%A"
+// Now if we try to map washAndCleanDish to dishes, we'll get and exception:
+try
+  List.map washAndCleanDish dishes
+with
+| DishException msg -> printfn "DishException: %s" msg; [] // -> we need this so the
+// compiler won't complain about type mismatches
+
+// To achieve our initial result, we're choosing specific dishes to wash and clean.
+// List.choose works as a combined filter and map: you return *Some value* based
+// on a condition; *Nothing* if the condition isn't met.
+let dishesToWash = List.choose (function DirtyDish as d -> Some d | _ -> None) dishes
+// Also, remember 'function' is just a shortcut to 'match' with the last argument.
+let dishesToClean = List.choose (fun d -> match d with WashedDish -> Some d | _ -> None) dishes
+
+// Now we wash our dirty dishes:
+let washedDishes = List.map washDish dishesToWash
+printfn "%A" washedDishes
+
+// And clean it all
+let cleanedDishes = List.map cleanDish <| dishesToClean @ washedDishes
+printfn "%A" cleanedDishes
+
+// Finally, we have all our dishes washed and cleaned. Shiny dishes :)
+let allDishesCleaned =
+  dishes
+  |> List.choose (function CleanDish as d -> Some d | _ -> None)
+  |> (@) <| cleanedDishes
+  // Understanding what's happening here is an exercise to the reader.
+
+printfn "%A" allDishesCleaned
